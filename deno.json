@@ -1,0 +1,14 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --allow-read=. --watch=.env,config.json main.ts",
+    "compile": "deno compile --allow-net --allow-env --allow-read main.ts"
+  },
+  "fmt": {
+    "singleQuote": true,
+    "semiColons": false
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.197.0/",
+    "superstruct": "npm:superstruct@^1.0.3/"
+  }
+}

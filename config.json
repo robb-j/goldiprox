@@ -1,0 +1,43 @@
+{
+  "routes": [
+    {
+      "pattern": { "pathname": "/example/" },
+      "type": "proxy",
+      "url": "https://example.com"
+    },
+    {
+      "pattern": { "pathname": "/api/*" },
+      "type": "redirect",
+      "url": "https://example.com/{{ pathname.groups.0 }}"
+    },
+    {
+      "pattern": { "pathname": "/proxy/:directory/some.:extension" },
+      "type": "proxy",
+      "url": "https://example.com/{{ pathname.groups.directory }}/{{ pathname.groups.extension }}"
+    },
+    {
+      "pattern": {
+        "hostname": "r.r0b.io",
+        "pathname": "/:path*"
+      },
+      "type": "redirect",
+      "url": "https://github.com/robb-j/{{ pathname.groups.path }}"
+    },
+    {
+      "pattern": {
+        "hostname": "r.r0b.io",
+        "pathname": "/"
+      },
+      "type": "redirect",
+      "url": "https://github.com/robb-j?tab=repositories"
+    },
+    {
+      "pattern": {
+        "hostname": "r0b.io",
+        "search": "*"
+      },
+      "type": "redirect",
+      "url": "https://example.com/?{{ search.groups.0 }}"
+    }
+  ]
+}
