@@ -26,7 +26,7 @@ export function loadJsonConfig<T>(url: URL, struct: Struct<T>): T {
 // deno-lint-ignore no-explicit-any
 export function dot(value: any, key: string[]) {
   const [head, ...tail] = key
-  if (!value || typeof value !== 'object') return undefined
+  if (value === undefined || typeof value !== 'object' || value === null) return undefined
   else if (tail.length > 0) return dot(value[head], tail)
   else return value[head]
 }
