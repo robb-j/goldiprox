@@ -142,7 +142,7 @@ refetch at the specified interval. The interval is in **milliseconds**.
 ## Deployment
 
 Goldiprox is designed to be run as a container however you like to run your
-containers. It runs as a non-root user, uses port `8000` internally and you
+containers. It runs as a non-root user `id=1000`, it internally uses port `8000` and you
 should mount your config at `/app/config.json`.
 
 > WIP
