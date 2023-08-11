@@ -10,6 +10,7 @@ A little programmable proxy built with [Deno](https://deno.land/) and based on
 Goldiprox is a minimal reverse-proxy and redirection server with routing based
 on the (semi) web-standards URLPattern. It is either configured with a static
 set of routes or it can pull down the routes to serve from a HTTP endpoint.
+
 Routes are a URLPattern and a target to tell it how to process the request. This
 is a simple redirection endpoint:
 
@@ -23,7 +24,7 @@ is a simple redirection endpoint:
 
 When the server gets a request for `https://example.com` it will return an HTTP
 redirect to `https://r0b.io`. This gets more interesting with the use of
-patterns or wildcards in the pattern:
+parameters or wildcards in the pattern:
 
 ```json
 {
@@ -34,10 +35,10 @@ patterns or wildcards in the pattern:
 ```
 
 Here we are starting to use the URLPattern more. In the pattern configuration,
-it not matches a wildcard path so any pathname on the host `example.com` under
-the `https` protocol. Then in the target URL, it is using the result of matching
-the URLPattern to template the URL and construct a url with the same path but
-prefixed with `/example/`. For example:
+it now matches a wildcard pathname on the host `example.com` under the `https`
+protocol is matched. Then in the target URL, it is using the match from the
+URLPattern to template a URL with the same path but prefixed with `/example/`.
+For example:
 
 - `https://example.com/` → `https://r0b.io/example/`
 - `https://example.com/hello` → `https://r0b.io/example/hello`
@@ -48,21 +49,26 @@ You can even match on other parts of the request, such as the subdomain:
 {
   "pattern": "https://:subdomain.example.com/*",
   "type": "redirect",
-  "url": "https://r0b.io/example/{{ hostname.groups.subdomain }}"
+  "url": "https://r0b.io/example/{{ hostname.groups.subdomain }}/{{ pathname.groups.0 }}"
 }
 ```
 
-Here it will use whatever subdomain you have passed and add it to the pathname
-in the redirection it generates. You can see here we've created the name match
-`subdomain` and we can reference that in the url template. With wildcards, they
-are numbered incrementally, but you can give them names instead.
+Here it will use whatever subdomain you have visited and add it to the pathname
+in the redirection it generates. You can see here we've created a parameter
+named `subdomain` and we can reference that in the URL template. With wildcards,
+they are numbered incrementally, but you can give them names instead.
 
 The pattern doesn't have to be just a string too, you can specify it partwise to
-only specify the bits that are interesting. The pattern is actually anything you
-can pass to the first parameter of
+only specify the bits that are interesting. The pattern is actually a subset of
+what you can pass to the first parameter of
 [URLPattern](https://developer.mozilla.org/en-US/docs/Web/API/URLPattern/URLPattern).
 The templating in the URL lets you reference anything from the result of
 [URLPattern#exec](https://developer.mozilla.org/en-US/docs/Web/API/URLPattern/exec).
+
+> There are some fields in the
+> [input](https://developer.mozilla.org/en-US/docs/Web/API/URLPattern/URLPattern#parameters)
+> that don't make sense in this context so they are emitted, namely
+> `username,password,baseURL,port`.
 
 ```json
 {
@@ -75,11 +81,16 @@ The templating in the URL lets you reference anything from the result of
 This is the same as before but is set on a per-component basis, it will use a
 wildcard for any component not set, such as the protocol and pathname in this
 case. Also note that the wildcard in pathname includes the `/` prefix, so you
-don't need to put it in the url template here.
+don't need to put it in the URL template here.
 
-So far this has all been about redirection, but the extra power is in proxying
-requests too. This lets you rewrite requests to look a different way or access
+So far this has all been about redirection, but the other power is in proxying
+requests. This lets you rewrite requests to look a different way or access
 things on networks not available to the client:
+
+> In the future there could be more options to proxy, e.g. to add secret headers
+> or parameters to the request during the proxy. For example you might want to
+> set an `Authorization` header in-flight to access resources behind
+> authentication.
 
 ```json
 {
@@ -99,13 +110,17 @@ versioned assets at a different location:
 From the requester's perspective they won't see `s3.r0b.io` as the request is
 proxied by the server instead.
 
+The next feature is that these routes can be dynamically generated. Goldiproxy
+can periodically fetch the routes from an external HTTP endpoint to let them
+change on demand to do cool and interesting things.
+
 ## Configuration
 
-Run Goldiprox with a JSON configuration, `config.json` which is an array of the
-routes described above. You can also specify an `endpoint`, which goldiprox will
-use the fetch more routes and merge them with the statically defined routes,
-both `routes` and `endpoint` are optional so you can set one both or neither.
-Although neither would be a pretty boring server.
+Run Goldiprox with a JSON configuration, `config.json`, which is an array of the
+`routes`, as described above. You can also specify an `endpoint` which goldiprox
+will use to periodically fetch routes and merge them with the static `routes`,
+both `routes` and `endpoint` are optional so you can set one, both or neither.
+Although setting neither would be a pretty boring server.
 
 ```json
 {
