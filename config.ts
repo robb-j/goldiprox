@@ -1,3 +1,4 @@
+import * as flags from 'std/flags/mod.ts'
 import {
   array,
   coerce,
@@ -83,4 +84,7 @@ export function getAppConfig(filename = 'config.json') {
   return config
 }
 
-if (import.meta.main) console.log(getAppConfig())
+if (import.meta.main) {
+  const { config } = flags.parse(Deno.args, { string: ['config'] })
+  console.log(getAppConfig(config))
+}
