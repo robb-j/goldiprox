@@ -39,7 +39,7 @@ async function proxy(input: string, request: Request) {
   const proxy = new Request(url, {
     method: request.method,
     headers,
-    body: request.bodyUsed ? await request.arrayBuffer() : undefined,
+    body: request.body,
     redirect: 'manual',
   })
 
