@@ -72,6 +72,10 @@ function compareRoutes(a: Route, b: Route) {
   return getRouteScore(a) - getRouteScore(b)
 }
 
+function prettyPattern(pattern: URLPattern) {
+  return `${pattern.hostname}${pattern.pathname}`
+}
+
 // Handle a HTTP request with our proxy or redirect logic
 function handleRequest(request: Request) {
   try {
@@ -95,16 +99,30 @@ function handleRequest(request: Request) {
 }
 
 if (import.meta.main) {
-  const { port = '8000', config = 'config.json' } = flags.parse(Deno.args, {
-    string: ['port', 'config'],
-  })
+  const { port = '8000', config = 'config.json', verbose } = flags.parse(
+    Deno.args,
+    {
+      string: ['port', 'config'],
+      boolean: ['verbose'],
+    },
+  )
 
   const appConfig = getAppConfig(config)
 
   appRoutes = appConfig.routes.toSorted(compareRoutes)
 
   if (appConfig.endpoint) {
-    setupEndpoint(appConfig.endpoint, appConfig.routes)
+    await setupEndpoint(appConfig.endpoint, appConfig.routes)
+  }
+
+  if (verbose) {
+    for (const route of appRoutes) {
+      console.log(
+        '%o → %s',
+        prettyPattern(route.pattern),
+        `${route.type}(${route.url})`,
+      )
+    }
   }
 
   Deno.serve({ port: parseInt(port) }, handleRequest)
