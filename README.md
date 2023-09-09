@@ -110,9 +110,28 @@ versioned assets at a different location:
 From the requester's perspective they won't see `s3.r0b.io` as the request is
 proxied by the server instead.
 
-The next feature is that these routes can be dynamically generated. Goldiproxy
-can periodically fetch the routes from an external HTTP endpoint to let them
-change on demand to do cool and interesting things.
+You can tell Goldiprox to inject headers or search parameters by adding `addHeaders` or `addSearchParams` fields to your route definitions.
+Headers injected to `proxy` routes and search parameters are added to the query string for `proxy` and `redirect` routes:
+
+```json
+{
+  "pattern": { "pathname": "/" },
+  "type": "proxy",
+  "url": "https://example.com",
+  "addHeaders": {
+    "Authorization": "top_secret"
+  },
+  "addSearchParams": {
+    "ref": "goldiprox"
+  },
+}
+```
+
+While proxying, the `Authorization` header will be injected into the proxy request and the `?ref=goldiprox` is added to the end of the URL.
+You can do the same with a `redirect` route, but you can't set headers, that only works with `proxy` routes.
+
+Goldiproxy can periodically fetch the routes from an external HTTP endpoint to let them
+change on demand to do cool and interesting things. See Configuration below.
 
 ## Configuration
 
