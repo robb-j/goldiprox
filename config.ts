@@ -35,6 +35,12 @@ export const Pattern = coerce(
   (v) => new URLPattern(v),
 )
 
+export type HttpHandler = (request: Request) => Promise<Response> | Response
+export const HttpHandler = define<HttpHandler>(
+  'http-handler',
+  (v) => typeof v === 'function',
+)
+
 export type RedirectRoute = Infer<typeof RedirectRoute>
 const RedirectRoute = object({
   type: literal('redirect'),
@@ -49,8 +55,15 @@ export const ProxyRoute = object({
   url: string(),
 })
 
+export type InternalRoute = Infer<typeof InternalRoute>
+export const InternalRoute = object({
+  type: literal('internal'),
+  pattern: Pattern,
+  fn: HttpHandler,
+})
+
 export type Route = Infer<typeof Route>
-export const Route = union([RedirectRoute, ProxyRoute])
+export const Route = union([RedirectRoute, ProxyRoute, InternalRoute])
 
 export type EndpointSource = Infer<typeof EndpointSource>
 export const EndpointSource = object({

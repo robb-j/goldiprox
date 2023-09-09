@@ -1,8 +1,26 @@
 import * as flags from 'std/flags/mod.ts'
-import { EndpointSource, getAppConfig, Route } from './config.ts'
+import { AppConfig, EndpointSource, getAppConfig, Route } from './config.ts'
 import { array, create, template } from './lib.ts'
 
+let appState: 'running' | 'shutdown' = 'running'
 let appRoutes: Route[] = []
+
+function getHealthz() {
+  return appState === 'running'
+    ? new Response('ok')
+    : new Response('terminating', { status: 503 })
+}
+
+function getBaseRoutes(appConfig: AppConfig): Route[] {
+  return [
+    ...appConfig.routes,
+    {
+      type: 'internal',
+      pattern: new URLPattern({ pathname: '/healthz{/}?' }),
+      fn: () => getHealthz(),
+    },
+  ]
+}
 
 async function fetchRoutes(endpoint: EndpointSource, staticRoutes: Route[]) {
   try {
@@ -29,7 +47,7 @@ function redirect(url: string | URL) {
 }
 
 // Create a proxy http response
-async function proxy(input: string, request: Request) {
+function proxy(input: string, request: Request) {
   const url = new URL(input)
   console.debug('proxy', url.toString())
 
@@ -72,8 +90,13 @@ function compareRoutes(a: Route, b: Route) {
   return getRouteScore(a) - getRouteScore(b)
 }
 
-function prettyPattern(pattern: URLPattern) {
-  return `${pattern.hostname}${pattern.pathname}`
+function prettyRoute(route: Route) {
+  const pattern = `${route.pattern.hostname}${route.pattern.pathname}`
+
+  if (route.type === 'redirect') return `${pattern} → redirect=${route.url}`
+  if (route.type === 'proxy') return `${pattern} → proxy=${route.url}`
+  if (route.type === 'internal') return `${pattern} → internal`
+  return 'unknown'
 }
 
 // Handle a HTTP request with our proxy or redirect logic
@@ -89,6 +112,9 @@ function handleRequest(request: Request) {
       if (route.type === 'proxy') {
         return proxy(template(route.url, match), request)
       }
+      if (route.type === 'internal') {
+        return route.fn(request)
+      }
     }
 
     return new Response('Not found', { status: 404 })
@@ -96,6 +122,18 @@ function handleRequest(request: Request) {
     console.error('Internal error', error)
     return new Response('Internal server error', { status: 500 })
   }
+}
+
+async function shutdown(appConfig: AppConfig, server: Deno.Server) {
+  console.log('Exiting...')
+  appState = 'shutdown'
+  server.unref()
+  if (appConfig.env !== 'development') {
+    // Wait longer in prod for connections to terminate
+    // and Load balancers to update
+    await new Promise((r) => setTimeout(r, 5_000))
+  }
+  Deno.exit()
 }
 
 if (import.meta.main) {
@@ -109,21 +147,21 @@ if (import.meta.main) {
 
   const appConfig = getAppConfig(config)
 
-  appRoutes = appConfig.routes.toSorted(compareRoutes)
+  appRoutes = getBaseRoutes(appConfig).toSorted(compareRoutes)
 
   if (appConfig.endpoint) {
-    await setupEndpoint(appConfig.endpoint, appConfig.routes)
+    await setupEndpoint(appConfig.endpoint, getBaseRoutes(appConfig))
   }
 
   if (verbose) {
+    console.log('ROUTES:')
     for (const route of appRoutes) {
-      console.log(
-        '%o → %s',
-        prettyPattern(route.pattern),
-        `${route.type}(${route.url})`,
-      )
+      console.log(prettyRoute(route))
     }
   }
 
-  Deno.serve({ port: parseInt(port) }, handleRequest)
+  const server = Deno.serve({ port: parseInt(port) }, handleRequest)
+
+  Deno.addSignalListener('SIGINT', () => shutdown(appConfig, server))
+  Deno.addSignalListener('SIGTERM', () => shutdown(appConfig, server))
 }
