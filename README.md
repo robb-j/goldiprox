@@ -3,8 +3,6 @@
 A little programmable proxy built with [Deno](https://deno.land/) and based on
 [URLPattern](https://developer.mozilla.org/en-US/docs/Web/API/URLPattern)
 
-> More documentation coming soon...
-
 ## About
 
 Goldiprox is a minimal reverse-proxy and redirection server with routing based
