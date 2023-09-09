@@ -1,3 +1,5 @@
+#!/usr/bin/env deno run --allow-net
+
 Deno.serve({ port: 9000 }, async (request) => {
   return Response.json({
     url: request.url,

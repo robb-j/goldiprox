@@ -30,7 +30,10 @@
         "pathname": "/"
       },
       "type": "redirect",
-      "url": "https://github.com/robb-j?tab=repositories"
+      "url": "https://github.com/robb-j?tab=repositories",
+      "addSearchParams": {
+        "ref": "goldiprox"
+      }
     },
     {
       "pattern": {
@@ -43,7 +46,13 @@
     {
       "pattern": { "pathname": "/echo/*" },
       "type": "proxy",
-      "url": "http://localhost:9000/{{ pathname.groups.0 }}"
+      "url": "http://localhost:9000/{{ pathname.groups.0 }}",
+      "addSearchParams": {
+        "ref": "goldiprox"
+      },
+      "addHeaders":{
+        "X-Hotel-Bar": "Hotel bar"
+      }
     }
   ]
 }

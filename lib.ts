@@ -43,3 +43,11 @@ export function template(input: string, context: any) {
     (_, variable: string) => dot(context, variable.split('.')),
   )
 }
+
+export function tryUrl(input: string ) {
+  try {
+    return new URL(input)
+  } catch {
+    return null
+  }
+}

@@ -1,5 +1,5 @@
 import * as flags from 'std/flags/mod.ts'
-import { AppConfig, EndpointSource, getAppConfig, Route } from './config.ts'
+import { AppConfig, getAppConfig, ProxyRoute, RedirectRoute, Route } from './config.ts'
 import { array, create, template } from './lib.ts'
 
 let appState: 'running' | 'shutdown' = 'running'
@@ -22,36 +22,41 @@ function getBaseRoutes(appConfig: AppConfig): Route[] {
   ]
 }
 
-async function fetchRoutes(endpoint: EndpointSource, staticRoutes: Route[]) {
+async function fetchRoutes(url: string, staticRoutes: Route[]) {
   try {
     const routes = create(
-      await fetch(endpoint.url).then((r) => r.json()),
+      await fetch(url).then((r) => r.json()),
       array(Route),
     )
-    appRoutes = [...staticRoutes, ...routes].toSorted(compareRoutes)
+    return [...staticRoutes, ...routes].toSorted(compareRoutes)
   } catch (error) {
     console.error('Failed to fetch routes', error)
-    appRoutes = [...staticRoutes].toSorted(compareRoutes)
+    return [...staticRoutes].toSorted(compareRoutes)
   }
 }
 
-async function setupEndpoint(endpoint: EndpointSource, staticRoutes: Route[]) {
-  await fetchRoutes(endpoint, staticRoutes)
-  setInterval(() => fetchRoutes(endpoint, staticRoutes), endpoint.interval)
-}
-
 // Create a redirection http Response
-function redirect(url: string | URL) {
+function redirect(route: RedirectRoute, match: URLPatternResult) {
+  const url = new URL(template(route.url, match))
+  for (const [name, value] of Object.entries(route.addSearchParams)) {
+    url.searchParams.set(name, value)
+  }
   console.debug('redirect', url.toString())
   return Response.redirect(url)
 }
 
 // Create a proxy http response
-function proxy(input: string, request: Request) {
-  const url = new URL(input)
+function proxy(route: ProxyRoute, match:URLPatternResult, request: Request) {
+  const url = new URL(template(route.url, match))
+  for (const [name, value] of Object.entries(route.addSearchParams)) {
+    url.searchParams.set(name, value)
+  }
   console.debug('proxy', url.toString())
 
   const headers = new Headers(request.headers)
+  for (const [name, value] of Object.entries(route.addHeaders)) {
+    headers.set(name, value)
+  }
   headers.set('Host', url.hostname)
 
   const proxy = new Request(url, {
@@ -107,10 +112,10 @@ function handleRequest(request: Request) {
       if (!match) continue
 
       if (route.type === 'redirect') {
-        return redirect(template(route.url, match))
+        return redirect(route, match)
       }
       if (route.type === 'proxy') {
-        return proxy(template(route.url, match), request)
+        return proxy(route, match, request)
       }
       if (route.type === 'internal') {
         return route.fn(request)
@@ -146,11 +151,19 @@ if (import.meta.main) {
   )
 
   const appConfig = getAppConfig(config)
+  const baseRoutes = getBaseRoutes(appConfig).toSorted(compareRoutes)
 
-  appRoutes = getBaseRoutes(appConfig).toSorted(compareRoutes)
+  // Add routes from CLI?
 
   if (appConfig.endpoint) {
-    await setupEndpoint(appConfig.endpoint, getBaseRoutes(appConfig))
+    const { url, interval } = appConfig.endpoint
+    appRoutes = await fetchRoutes(url, baseRoutes)
+    
+    setInterval(async () => {
+      appRoutes = await fetchRoutes(url, baseRoutes)
+    }, interval)
+  } else {
+    appRoutes = baseRoutes
   }
 
   if (verbose) {

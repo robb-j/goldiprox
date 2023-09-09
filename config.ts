@@ -12,6 +12,7 @@ import {
   number,
   object,
   optional,
+  record,
   string,
   union,
 } from './lib.ts'
@@ -46,6 +47,7 @@ const RedirectRoute = object({
   type: literal('redirect'),
   pattern: Pattern,
   url: string(),
+  addSearchParams: defaulted(record(string(), string()), {}),
 })
 
 export type ProxyRoute = Infer<typeof ProxyRoute>
@@ -53,6 +55,8 @@ export const ProxyRoute = object({
   type: literal('proxy'),
   pattern: Pattern,
   url: string(),
+  addHeaders: defaulted(record(string(), string()), {}),
+  addSearchParams: defaulted(record(string(), string()), {}),
 })
 
 export type InternalRoute = Infer<typeof InternalRoute>
