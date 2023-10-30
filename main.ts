@@ -1,5 +1,11 @@
 import * as flags from 'std/flags/mod.ts'
-import { AppConfig, getAppConfig, ProxyRoute, RedirectRoute, Route } from './config.ts'
+import {
+  AppConfig,
+  getAppConfig,
+  ProxyRoute,
+  RedirectRoute,
+  Route,
+} from './config.ts'
 import { array, create, template } from './lib.ts'
 
 let appState: 'running' | 'shutdown' = 'running'
@@ -10,10 +16,22 @@ function getHealthz() {
     ? new Response('ok')
     : new Response('terminating', { status: 503 })
 }
+function dumpRoutes() {
+  return Response.json(appRoutes.map((r) => dumpRoute(r)))
+}
 
 function getBaseRoutes(appConfig: AppConfig): Route[] {
+  const extras: Route[] = []
+  if (appConfig.env === 'development') {
+    extras.push({
+      type: 'internal',
+      pattern: new URLPattern({ pathname: '/routesz{/}?' }),
+      fn: () => dumpRoutes(),
+    })
+  }
   return [
     ...appConfig.routes,
+    ...extras,
     {
       type: 'internal',
       pattern: new URLPattern({ pathname: '/healthz{/}?' }),
@@ -46,7 +64,7 @@ function redirect(route: RedirectRoute, match: URLPatternResult) {
 }
 
 // Create a proxy http response
-function proxy(route: ProxyRoute, match:URLPatternResult, request: Request) {
+function proxy(route: ProxyRoute, match: URLPatternResult, request: Request) {
   const url = new URL(template(route.url, match))
   for (const [name, value] of Object.entries(route.addSearchParams)) {
     url.searchParams.set(name, value)
@@ -76,7 +94,6 @@ function getRouteScore(route: Route) {
     route.pattern.pathname,
     route.pattern.search,
     route.pattern.protocol,
-    route.pattern.port,
   ]
     .map((str) => getPatternScore(str))
     .reduce((sum, count) => sum + count, 0)
@@ -87,12 +104,23 @@ function getRouteScore(route: Route) {
 // - more specific -> sooner
 // - longer match -> sooner
 function getPatternScore(pattern: string) {
-  return ((pattern.match(/[\*:]/g)?.length ?? 0) * 100) -
+  return ((pattern.match(/[\*:]/g)?.length ?? 0) * 1000) -
     pattern.length
 }
 
 function compareRoutes(a: Route, b: Route) {
   return getRouteScore(a) - getRouteScore(b)
+}
+
+function dumpRoute(route: Route) {
+  const pattern =
+    `${route.pattern.protocol}//${route.pattern.hostname}:${route.pattern.port}${route.pattern.pathname}`
+  const score = getRouteScore(route)
+
+  if (route.type === 'redirect') return { ...route, pattern, score }
+  if (route.type === 'proxy') return { ...route, pattern, score }
+  if (route.type === 'internal') return { type: 'internal', pattern, score }
+  return 'unknown'
 }
 
 function prettyRoute(route: Route) {
@@ -151,19 +179,19 @@ if (import.meta.main) {
   )
 
   const appConfig = getAppConfig(config)
-  const baseRoutes = getBaseRoutes(appConfig).toSorted(compareRoutes)
+  const baseRoutes = getBaseRoutes(appConfig)
 
   // Add routes from CLI?
 
   if (appConfig.endpoint) {
     const { url, interval } = appConfig.endpoint
     appRoutes = await fetchRoutes(url, baseRoutes)
-    
+
     setInterval(async () => {
       appRoutes = await fetchRoutes(url, baseRoutes)
     }, interval)
   } else {
-    appRoutes = baseRoutes
+    appRoutes = baseRoutes.toSorted(compareRoutes)
   }
 
   if (verbose) {
