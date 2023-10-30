@@ -109,7 +109,7 @@ function getPatternScore(pattern: string) {
 }
 
 function compareRoutes(a: Route, b: Route) {
-  return getRouteScore(a) - getRouteScore(b)
+  return getRouteScore(b) - getRouteScore(a)
 }
 
 function dumpRoute(route: Route) {
