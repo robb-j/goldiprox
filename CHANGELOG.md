@@ -3,6 +3,11 @@
 
 This file contains notable changes to the project
 
+## 0.3.0
+
+* **feature** added a `/routesz` endpoint, similarly named to `/healthz`, to dump the routes and their scores. This is only enabled when `env == development`
+* **fix** the routes are now sorted as expected, most specific first, most parameters later.
+
 ## 0.2.0
 
 * **feature** inject headers on `proxy` routes with optional `addHeaders`
