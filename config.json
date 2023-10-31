@@ -50,9 +50,13 @@
       "addSearchParams": {
         "ref": "goldiprox"
       },
-      "addHeaders":{
+      "addHeaders": {
         "X-Hotel-Bar": "Hotel bar"
       }
     }
-  ]
+  ],
+  "endpoint": {
+    "url": "https://hub.openlab.dev/api/switchboard/v1/goldiprox",
+    "interval": 60000
+  }
 }

@@ -26,8 +26,9 @@ export function loadJsonConfig<T>(url: URL, struct: Struct<T>): T {
 // deno-lint-ignore no-explicit-any
 export function dot(value: any, key: string[]) {
   const [head, ...tail] = key
-  if (value === undefined || typeof value !== 'object' || value === null) return undefined
-  else if (tail.length > 0) return dot(value[head], tail)
+  if (value === undefined || typeof value !== 'object' || value === null) {
+    return undefined
+  } else if (tail.length > 0) return dot(value[head], tail)
   else return value[head]
 }
 
@@ -40,11 +41,11 @@ export function dot(value: any, key: string[]) {
 export function template(input: string, context: any) {
   return input.replace(
     /{{\s*([\w.$]+)\s*}}/g,
-    (_, variable: string) => dot(context, variable.split('.')),
+    (_, variable: string) => dot(context, variable.split('.')) ?? '',
   )
 }
 
-export function tryUrl(input: string ) {
+export function tryUrl(input: string) {
   try {
     return new URL(input)
   } catch {

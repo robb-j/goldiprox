@@ -8,35 +8,44 @@ import {
 } from './config.ts'
 import { array, create, template } from './lib.ts'
 
-let appState: 'running' | 'shutdown' = 'running'
-let appRoutes: Route[] = []
+interface AppContext {
+  state: 'running' | 'shutdown'
+  routes: Route[]
+  log(message: string, ...args: unknown[]): void
+}
 
-function getHealthz() {
-  return appState === 'running'
+const app: AppContext = {
+  state: 'running',
+  routes: [],
+  log() {},
+}
+
+export function getHealthz(state: string) {
+  return state === 'running'
     ? new Response('ok')
     : new Response('terminating', { status: 503 })
 }
-function dumpRoutes() {
-  return Response.json(appRoutes.map((r) => dumpRoute(r)))
+export function getRoutesz(routes: Route[]) {
+  return Response.json(routes.map((r) => dumpRoute(r)))
 }
 
-function getBaseRoutes(appConfig: AppConfig): Route[] {
+export function getBaseRoutes(appConfig: AppConfig): Route[] {
   const extras: Route[] = []
   if (appConfig.env === 'development') {
     extras.push({
       type: 'internal',
       pattern: new URLPattern({ pathname: '/routesz{/}?' }),
-      fn: () => dumpRoutes(),
+      fn: () => getRoutesz(app.routes),
     })
   }
   return [
-    ...appConfig.routes,
-    ...extras,
     {
       type: 'internal',
       pattern: new URLPattern({ pathname: '/healthz{/}?' }),
-      fn: () => getHealthz(),
+      fn: () => getHealthz(app.state),
     },
+    ...extras,
+    ...appConfig.routes,
   ]
 }
 
@@ -54,22 +63,25 @@ async function fetchRoutes(url: string, staticRoutes: Route[]) {
 }
 
 // Create a redirection http Response
-function redirect(route: RedirectRoute, match: URLPatternResult) {
+export function redirect(route: RedirectRoute, match: unknown) {
   const url = new URL(template(route.url, match))
   for (const [name, value] of Object.entries(route.addSearchParams)) {
     url.searchParams.set(name, value)
   }
-  console.debug('redirect', url.toString())
+  app.log('redirect', url.toString())
   return Response.redirect(url)
 }
 
-// Create a proxy http response
-function proxy(route: ProxyRoute, match: URLPatternResult, request: Request) {
+export function getProxyRequest(
+  route: ProxyRoute,
+  match: unknown,
+  request: Request,
+) {
   const url = new URL(template(route.url, match))
   for (const [name, value] of Object.entries(route.addSearchParams)) {
     url.searchParams.set(name, value)
   }
-  console.debug('proxy', url.toString())
+  app.log('proxy', url.toString())
 
   const headers = new Headers(request.headers)
   for (const [name, value] of Object.entries(route.addHeaders)) {
@@ -77,14 +89,17 @@ function proxy(route: ProxyRoute, match: URLPatternResult, request: Request) {
   }
   headers.set('Host', url.hostname)
 
-  const proxy = new Request(url, {
+  return new Request(url, {
     method: request.method,
     headers,
     body: request.body,
     redirect: 'manual',
   })
+}
 
-  return fetch(proxy)
+// Create a proxy http response
+function proxy(route: ProxyRoute, match: URLPatternResult, request: Request) {
+  return fetch(getProxyRequest(route, match, request))
 }
 
 // Score a route for sorting
@@ -133,9 +148,9 @@ function prettyRoute(route: Route) {
 }
 
 // Handle a HTTP request with our proxy or redirect logic
-function handleRequest(request: Request) {
+function handleRequest(request: Request, app: AppContext) {
   try {
-    for (const route of appRoutes) {
+    for (const route of app.routes) {
       const match = route.pattern.exec(request.url)
       if (!match) continue
 
@@ -159,7 +174,7 @@ function handleRequest(request: Request) {
 
 async function shutdown(appConfig: AppConfig, server: Deno.Server) {
   console.log('Exiting...')
-  appState = 'shutdown'
+  app.state = 'shutdown'
   server.unref()
   if (appConfig.env !== 'development') {
     // Wait longer in prod for connections to terminate
@@ -170,38 +185,45 @@ async function shutdown(appConfig: AppConfig, server: Deno.Server) {
 }
 
 if (import.meta.main) {
-  const { port = '8000', config = 'config.json', verbose } = flags.parse(
-    Deno.args,
-    {
-      string: ['port', 'config'],
-      boolean: ['verbose'],
-    },
-  )
+  const {
+    port = '8000',
+    config = 'config.json',
+    verbose,
+    log = false,
+  } = flags.parse(Deno.args, {
+    string: ['port', 'config'],
+    boolean: ['verbose', 'log'],
+  })
 
   const appConfig = getAppConfig(config)
   const baseRoutes = getBaseRoutes(appConfig)
+
+  if (log) app.log = console.log
 
   // Add routes from CLI?
 
   if (appConfig.endpoint) {
     const { url, interval } = appConfig.endpoint
-    appRoutes = await fetchRoutes(url, baseRoutes)
+    app.routes = await fetchRoutes(url, baseRoutes)
 
     setInterval(async () => {
-      appRoutes = await fetchRoutes(url, baseRoutes)
+      app.routes = await fetchRoutes(url, baseRoutes)
     }, interval)
   } else {
-    appRoutes = baseRoutes.toSorted(compareRoutes)
+    app.routes = baseRoutes.toSorted(compareRoutes)
   }
 
   if (verbose) {
     console.log('ROUTES:')
-    for (const route of appRoutes) {
+    for (const route of app.routes) {
       console.log(prettyRoute(route))
     }
   }
 
-  const server = Deno.serve({ port: parseInt(port) }, handleRequest)
+  const server = Deno.serve(
+    { port: parseInt(port) },
+    (r) => handleRequest(r, app),
+  )
 
   Deno.addSignalListener('SIGINT', () => shutdown(appConfig, server))
   Deno.addSignalListener('SIGTERM', () => shutdown(appConfig, server))

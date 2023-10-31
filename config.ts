@@ -92,6 +92,16 @@ export const AppConfig = envObj({
   endpoint: optional(EndpointSource),
 })
 
+export const testingAppConfig: AppConfig = {
+  env: 'testing',
+  selfUrl: 'http://testing.local',
+  meta: {
+    name: 'goldiprox',
+    version: 'v1.2.3',
+  },
+  routes: [],
+}
+
 export function getAppConfig(filename = 'config.json') {
   const config = loadJsonConfig(
     new URL(filename, import.meta.url),
