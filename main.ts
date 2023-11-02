@@ -19,14 +19,28 @@ const app: AppContext = {
   routes: [],
   log() {},
 }
-const localhostPattern = '(localhost|127.0.0.1)'
 
-export function getHealthz(state: string) {
+function internalHostnames() {
+  const segments = [
+    'localhost',
+    Deno.hostname(),
+    ...Deno.networkInterfaces()
+      .filter((i) => i.family === 'IPv4')
+      .map((i) => i.address),
+  ]
+  return `(${segments.join('|')})`
+}
+
+console.log(internalHostnames())
+
+export function getHealthz(request: Request, state: string) {
+  app.log('healthz', request.url.toString())
   return state === 'running'
     ? new Response('ok')
     : new Response('terminating', { status: 503 })
 }
-export function getRoutesz(routes: Route[]) {
+export function getRoutesz(request: Request, routes: Route[]) {
+  app.log('routesz', request.url.toString())
   return Response.json(routes.map((r) => dumpRoute(r)))
 }
 
@@ -36,20 +50,20 @@ export function getBaseRoutes(appConfig: AppConfig): Route[] {
     extras.push({
       type: 'internal',
       pattern: new URLPattern({
-        hostname: localhostPattern,
+        // hostname: localhostPattern(),
         pathname: '/routesz{/}?',
       }),
-      fn: () => getRoutesz(app.routes),
+      fn: (r) => getRoutesz(r, app.routes),
     })
   }
   return [
     {
       type: 'internal',
       pattern: new URLPattern({
-        hostname: localhostPattern,
+        // hostname: localhostPattern(),
         pathname: '/healthz{/}?',
       }),
-      fn: () => getHealthz(app.state),
+      fn: (r) => getHealthz(r, app.state),
     },
     ...extras,
     ...appConfig.routes,
