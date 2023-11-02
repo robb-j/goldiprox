@@ -19,6 +19,7 @@ const app: AppContext = {
   routes: [],
   log() {},
 }
+const localhostPattern = '(localhost|127.0.0.1)'
 
 export function getHealthz(state: string) {
   return state === 'running'
@@ -34,14 +35,20 @@ export function getBaseRoutes(appConfig: AppConfig): Route[] {
   if (appConfig.env === 'development') {
     extras.push({
       type: 'internal',
-      pattern: new URLPattern({ pathname: '/routesz{/}?' }),
+      pattern: new URLPattern({
+        hostname: localhostPattern,
+        pathname: '/routesz{/}?',
+      }),
       fn: () => getRoutesz(app.routes),
     })
   }
   return [
     {
       type: 'internal',
-      pattern: new URLPattern({ pathname: '/healthz{/}?' }),
+      pattern: new URLPattern({
+        hostname: localhostPattern,
+        pathname: '/healthz{/}?',
+      }),
       fn: () => getHealthz(app.state),
     },
     ...extras,
@@ -124,7 +131,7 @@ function getPatternScore(pattern: string) {
 }
 
 function compareRoutes(a: Route, b: Route) {
-  return getRouteScore(b) - getRouteScore(a)
+  return getRouteScore(a) - getRouteScore(b)
 }
 
 function dumpRoute(route: Route) {

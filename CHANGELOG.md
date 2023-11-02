@@ -3,6 +3,11 @@
 
 This file contains notable changes to the project
 
+## 0.3.1
+
+- **fix** sort routes the correct way again, `0.3.0` was wrong
+- **fix** make `routesz`/`healthz` more specific so they only trigger on localhost
+
 ## 0.3.0
 
 * **feature** added a `/routesz` endpoint, similarly named to `/healthz`, to dump the routes and their scores. This is only enabled when `env == development`
