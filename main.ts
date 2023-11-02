@@ -23,15 +23,12 @@ const app: AppContext = {
 function internalHostnames() {
   const segments = [
     'localhost',
-    Deno.hostname(),
     ...Deno.networkInterfaces()
       .filter((i) => i.family === 'IPv4')
       .map((i) => i.address),
   ]
   return `(${segments.join('|')})`
 }
-
-console.log(internalHostnames())
 
 export function getHealthz(request: Request, state: string) {
   app.log('healthz', request.url.toString())
@@ -50,7 +47,7 @@ export function getBaseRoutes(appConfig: AppConfig): Route[] {
     extras.push({
       type: 'internal',
       pattern: new URLPattern({
-        // hostname: localhostPattern(),
+        hostname: internalHostnames(),
         pathname: '/routesz{/}?',
       }),
       fn: (r) => getRoutesz(r, app.routes),
@@ -60,7 +57,7 @@ export function getBaseRoutes(appConfig: AppConfig): Route[] {
     {
       type: 'internal',
       pattern: new URLPattern({
-        // hostname: localhostPattern(),
+        hostname: internalHostnames(),
         pathname: '/healthz{/}?',
       }),
       fn: (r) => getHealthz(r, app.state),
