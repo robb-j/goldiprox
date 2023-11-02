@@ -2,6 +2,10 @@
 
 This file contains notable changes to the project
 
+## 0.3.4
+
+- **fix** reimplement internal routing for `healthz` & `routesz`
+
 ## 0.3.3
 
 - **fix** revert incorrect internal hostnames for `healthz` & `routesz`
