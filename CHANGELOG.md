@@ -1,7 +1,10 @@
 # Change log
 
-
 This file contains notable changes to the project
+
+## 0.3.2
+
+- **feature** upgrade container to deno `1.37.2`
 
 ## 0.3.1
 
