@@ -16,7 +16,7 @@ import {
   string,
   union,
 } from './lib.ts'
-import app from './app.json' assert { type: 'json' }
+import app from './app.json' with { type: 'json' }
 
 const PatternInit = object({
   // username: optional(string()),

@@ -7,18 +7,23 @@ import {
   redirect,
 } from './main.ts'
 import { testingAppConfig } from './config.ts'
-import { assert } from './lib.ts'
 
 //
 // getHealthz
 //
 Deno.test('#getHealthz returns an ok', async () => {
-  const result = getHealthz('running')
+  const result = getHealthz(
+    new Request('http://localhost:8000/healthz'),
+    'running',
+  )
   assertEquals(result.status, 200, 'It should be a http/200')
   assertEquals(await result.text(), 'ok', 'It should say ok')
 })
 Deno.test('#getHealthz returns a terminating', async () => {
-  const result = getHealthz('terminating')
+  const result = getHealthz(
+    new Request('http://localhost:8000/healthz'),
+    'terminating',
+  )
   assertEquals(result.status, 503, 'It should be a http/503')
   assertEquals(await result.text(), 'terminating', 'It should say terminating')
 })
@@ -27,7 +32,7 @@ Deno.test('#getHealthz returns a terminating', async () => {
 // getRoutesz
 //
 Deno.test('#getRoutesz sends an JSON array', async () => {
-  const result = getRoutesz([])
+  const result = getRoutesz(new Request('http://localhost:8000/healthz'), [])
   assertEquals(result.status, 200, 'It should be a http/200')
   assertEquals(
     result.headers.get('content-type'),
@@ -37,7 +42,7 @@ Deno.test('#getRoutesz sends an JSON array', async () => {
   assertEquals(await result.json(), [], 'It should say ok')
 })
 Deno.test('#getRoutesz sends dumped routes', async () => {
-  const result = getRoutesz([{
+  const result = getRoutesz(new Request('http://localhost:8000/healthz'), [{
     type: 'internal',
     pattern: new URLPattern({ pathname: '/' }),
     fn: () => new Response(),
@@ -137,7 +142,7 @@ Deno.test('#redirect injects search parameters', () => {
 //
 // getProxyRequest
 //
-Deno.test('#getProxyRequest creates a request to proxy the inbound request', async () => {
+Deno.test('#getProxyRequest creates a request', async () => {
   const result = getProxyRequest(
     {
       type: 'proxy',
@@ -148,6 +153,7 @@ Deno.test('#getProxyRequest creates a request to proxy the inbound request', asy
     },
     {},
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
+    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
 
   assertEquals(
@@ -163,6 +169,46 @@ Deno.test('#getProxyRequest creates a request to proxy the inbound request', asy
   assertEquals(result.redirect, 'manual', 'it should not follow redirects')
   assertEquals(await result.text(), 'hello', 'it should send the inbound body')
 })
+Deno.test('#getProxyRequest sets headers', () => {
+  const result = getProxyRequest(
+    {
+      type: 'proxy',
+      pattern: new URLPattern({ pathname: '/' }),
+      url: 'https://example.com',
+      addSearchParams: {},
+      addHeaders: {},
+    },
+    {},
+    new Request('http://testing.local', { method: 'POST', body: 'hello' }),
+    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
+  )
+
+  assertEquals(
+    result.headers.get('host'),
+    'example.com',
+    'it should set the "host" header',
+  )
+  assertEquals(
+    result.headers.get('x-real-ip'),
+    '127.0.0.1',
+    'it should set the "x-real-ip" header',
+  )
+  assertEquals(
+    result.headers.get('x-forwarded-host'),
+    'example.com',
+    'it should set the "x-forwarded-host" header',
+  )
+  assertEquals(
+    result.headers.get('x-forwarded-for'),
+    '127.0.0.1',
+    'it should set the "x-forwarded-for" header',
+  )
+  assertEquals(
+    result.headers.get('x-forwarded-proto'),
+    'http',
+    'it should set the "x-forwarded-proto" header',
+  )
+})
 Deno.test('#getProxyRequest replaces patterns in the URL', () => {
   const result = getProxyRequest(
     {
@@ -174,6 +220,7 @@ Deno.test('#getProxyRequest replaces patterns in the URL', () => {
     },
     { pathname: { groups: { slug: 'albatross' } } },
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
+    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
 
   assertEquals(
@@ -193,6 +240,7 @@ Deno.test('#getProxyRequest inject headers onto the request', () => {
     },
     {},
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
+    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
 
   assertEquals(
@@ -212,6 +260,7 @@ Deno.test('#getProxyRequest append search parameters onto the request', () => {
     },
     {},
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
+    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
 
   assertEquals(

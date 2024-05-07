@@ -94,6 +94,7 @@ export function getProxyRequest(
   route: ProxyRoute,
   match: unknown,
   request: Request,
+  remoteAddr: Deno.NetAddr,
 ) {
   const url = new URL(template(route.url, match))
   for (const [name, value] of Object.entries(route.addSearchParams)) {
@@ -106,6 +107,13 @@ export function getProxyRequest(
     headers.set(name, value)
   }
   headers.set('Host', url.hostname)
+  headers.set('X-Real-IP', remoteAddr.hostname)
+  headers.set('X-Forwarded-Host', url.hostname)
+  headers.set('X-Forwarded-For', remoteAddr.hostname)
+  headers.set(
+    'X-Forwarded-Proto',
+    URL.parse(request.url)?.protocol.replace(/:$/, '') ?? 'http',
+  )
 
   return new Request(url, {
     method: request.method,
@@ -116,8 +124,13 @@ export function getProxyRequest(
 }
 
 // Create a proxy http response
-function proxy(route: ProxyRoute, match: URLPatternResult, request: Request) {
-  return fetch(getProxyRequest(route, match, request))
+function proxy(
+  route: ProxyRoute,
+  match: URLPatternResult,
+  request: Request,
+  info: Deno.ServeHandlerInfo,
+) {
+  return fetch(getProxyRequest(route, match, request, info.remoteAddr))
 }
 
 // Score a route for sorting
@@ -166,7 +179,11 @@ function prettyRoute(route: Route) {
 }
 
 // Handle a HTTP request with our proxy or redirect logic
-function handleRequest(request: Request, app: AppContext) {
+function handleRequest(
+  request: Request,
+  info: Deno.ServeHandlerInfo,
+  app: AppContext,
+) {
   try {
     for (const route of app.routes) {
       const match = route.pattern.exec(request.url)
@@ -176,7 +193,7 @@ function handleRequest(request: Request, app: AppContext) {
         return redirect(route, match)
       }
       if (route.type === 'proxy') {
-        return proxy(route, match, request)
+        return proxy(route, match, request, info)
       }
       if (route.type === 'internal') {
         return route.fn(request)
@@ -240,7 +257,7 @@ if (import.meta.main) {
 
   const server = Deno.serve(
     { port: parseInt(port) },
-    (r) => handleRequest(r, app),
+    (r, i) => handleRequest(r, i, app),
   )
 
   Deno.addSignalListener('SIGINT', () => shutdown(appConfig, server))

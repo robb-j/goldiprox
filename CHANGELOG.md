@@ -2,6 +2,11 @@
 
 This file contains notable changes to the project
 
+## 0.4.0
+
+- **feature** set `x-forwarded-` headers when using proxy
+- **fix** upgrade the container to use deno `1.43.1`
+
 ## 0.3.4
 
 - **fix** reimplement internal routing for `healthz` & `routesz`

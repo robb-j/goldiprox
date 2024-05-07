@@ -10,7 +10,7 @@
     "semiColons": false
   },
   "imports": {
-    "std/": "https://deno.land/std@0.197.0/",
+    "std/": "https://deno.land/std@0.224.0/",
     "superstruct": "npm:superstruct@^1.0.3/"
   }
 }
