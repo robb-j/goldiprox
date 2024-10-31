@@ -2,6 +2,11 @@
 
 This file contains notable changes to the project
 
+## 0.4.1
+
+- **fix** search parameters are preserved while proxying/redirecting, i.e. the
+  parameters on the request are set on the redirect location and proxied request
+
 ## 0.4.0
 
 - **feature** set `x-forwarded-` headers when using proxy
