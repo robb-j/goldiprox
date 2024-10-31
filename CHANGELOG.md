@@ -6,6 +6,7 @@ This file contains notable changes to the project
 
 - **fix** search parameters are preserved while proxying/redirecting, i.e. the
   parameters on the request are set on the redirect location and proxied request
+- **change** the container is now based on `alpine-1.46.3`
 
 ## 0.4.0
 
