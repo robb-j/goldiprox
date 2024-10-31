@@ -81,9 +81,18 @@ async function fetchRoutes(url: string, staticRoutes: Route[]) {
 }
 
 // Create a redirection http Response
-export function redirect(route: RedirectRoute, match: unknown) {
+export function redirect(
+  route: RedirectRoute,
+  match: unknown,
+  request: Request,
+) {
   const url = new URL(template(route.url, match))
+  // Copy search params from the route
   for (const [name, value] of Object.entries(route.addSearchParams)) {
+    url.searchParams.set(name, value)
+  }
+  // Copy search params on the request
+  for (const [name, value] of new URL(request.url).searchParams) {
     url.searchParams.set(name, value)
   }
   app.log('redirect', url.toString())
@@ -97,11 +106,17 @@ export function getProxyRequest(
   remoteAddr: Deno.NetAddr,
 ) {
   const url = new URL(template(route.url, match))
+  // Copy search params from the route
   for (const [name, value] of Object.entries(route.addSearchParams)) {
+    url.searchParams.set(name, value)
+  }
+  // Copy search params on the request
+  for (const [name, value] of new URL(request.url).searchParams) {
     url.searchParams.set(name, value)
   }
   app.log('proxy', url.toString())
 
+  // Copy headers on the route
   const headers = new Headers(request.headers)
   for (const [name, value] of Object.entries(route.addHeaders)) {
     headers.set(name, value)
@@ -190,7 +205,7 @@ function handleRequest(
       if (!match) continue
 
       if (route.type === 'redirect') {
-        return redirect(route, match)
+        return redirect(route, match, request)
       }
       if (route.type === 'proxy') {
         return proxy(route, match, request, info)
