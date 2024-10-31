@@ -1,4 +1,4 @@
-import { assertEquals } from 'std/assert/mod.ts'
+import { assertEquals } from '@std/assert'
 import { dot, template, tryUrl } from './lib.ts'
 
 //

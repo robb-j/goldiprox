@@ -1,4 +1,4 @@
-import * as flags from 'std/flags/mod.ts'
+import { parseArgs } from '@std/cli/parse-args'
 import {
   AppConfig,
   getAppConfig,
@@ -240,7 +240,7 @@ if (import.meta.main) {
     config = 'config.json',
     verbose,
     log = false,
-  } = flags.parse(Deno.args, {
+  } = parseArgs(Deno.args, {
     string: ['port', 'config'],
     boolean: ['verbose', 'log'],
   })

@@ -1,4 +1,4 @@
-import * as flags from 'std/flags/mod.ts'
+import { parseArgs } from '@std/cli/parse-args'
 import {
   array,
   coerce,
@@ -112,6 +112,6 @@ export function getAppConfig(filename = 'config.json') {
 }
 
 if (import.meta.main) {
-  const { config } = flags.parse(Deno.args, { string: ['config'] })
+  const { config } = parseArgs(Deno.args, { string: ['config'] })
   console.log(getAppConfig(config))
 }

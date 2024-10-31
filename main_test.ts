@@ -1,4 +1,4 @@
-import { assertEquals } from 'std/assert/mod.ts'
+import { assertEquals } from '@std/assert'
 import {
   getBaseRoutes,
   getHealthz,
@@ -95,12 +95,16 @@ Deno.test('#getBaseRoutes includes routes from the AppConfig', () => {
 // redirect
 //
 Deno.test('#redirect returns a http redirection', () => {
-  const result = redirect({
-    type: 'redirect',
-    pattern: new URLPattern({ pathname: '/' }),
-    url: 'https://example.com',
-    addSearchParams: {},
-  }, {})
+  const result = redirect(
+    {
+      type: 'redirect',
+      pattern: new URLPattern({ pathname: '/' }),
+      url: 'https://example.com',
+      addSearchParams: {},
+    },
+    {},
+    new Request('http://testing.local'),
+  )
 
   assertEquals(result.status, 302, 'it should be a http/302')
   assertEquals(
@@ -110,12 +114,16 @@ Deno.test('#redirect returns a http redirection', () => {
   )
 })
 Deno.test('#redirect replaces patterns in the location', () => {
-  const result = redirect({
-    type: 'redirect',
-    pattern: new URLPattern({ pathname: '/:slug' }),
-    url: 'https://example.com/{{ pathname.groups.slug }}',
-    addSearchParams: {},
-  }, { pathname: { groups: { slug: 'albatross' } } })
+  const result = redirect(
+    {
+      type: 'redirect',
+      pattern: new URLPattern({ pathname: '/:slug' }),
+      url: 'https://example.com/{{ pathname.groups.slug }}',
+      addSearchParams: {},
+    },
+    { pathname: { groups: { slug: 'albatross' } } },
+    new Request('http://testing.local'),
+  )
 
   assertEquals(result.status, 302, 'it should be a http/302')
   assertEquals(
@@ -125,18 +133,37 @@ Deno.test('#redirect replaces patterns in the location', () => {
   )
 })
 Deno.test('#redirect injects search parameters', () => {
-  const result = redirect({
-    type: 'redirect',
-    pattern: new URLPattern({ pathname: '/' }),
-    url: 'https://example.com',
-    addSearchParams: { some: 'thing' },
-  }, {})
+  const result = redirect(
+    {
+      type: 'redirect',
+      pattern: new URLPattern({ pathname: '/' }),
+      url: 'https://example.com',
+      addSearchParams: { some: 'thing' },
+    },
+    {},
+    new Request('http://testing.local'),
+  )
 
   assertEquals(
     result.headers.get('location'),
     'https://example.com/?some=thing',
     'it add URLSearchParameters onto the end',
   )
+})
+Deno.test('#redirect preserves request search parameters', () => {
+  const result = redirect(
+    {
+      type: 'redirect',
+      pattern: new URLPattern({ pathname: '/' }),
+      url: 'https://example.com',
+      addSearchParams: {},
+    },
+    {},
+    new Request('http://testing.local?name=Geoff'),
+  )
+
+  const url = new URL(result.headers.get('location')!)
+  assertEquals(url.searchParams.get('name'), 'Geoff')
 })
 
 //
@@ -268,4 +295,21 @@ Deno.test('#getProxyRequest append search parameters onto the request', () => {
     'https://example.com/?hello=there',
     'it should append URL parameters based on addSearchParams',
   )
+})
+Deno.test('#getProxyRequest preserves request search parameters', () => {
+  const result = getProxyRequest(
+    {
+      type: 'proxy',
+      pattern: new URLPattern({ pathname: '/' }),
+      url: 'https://example.com',
+      addSearchParams: {},
+      addHeaders: {},
+    },
+    {},
+    new Request('http://testing.local?name=Geoff'),
+    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
+  )
+
+  const url = new URL(result.url)
+  assertEquals(url.searchParams.get('name'), 'Geoff')
 })
