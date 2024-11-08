@@ -80,21 +80,33 @@ async function fetchRoutes(url: string, staticRoutes: Route[]) {
   }
 }
 
+// Expand the URL from a route with the matched content and inbound request
+export function expandUrl(
+  route: RedirectRoute | ProxyRoute,
+  match: unknown,
+  request: Request,
+) {
+  const url = new URL(template(route.url, match))
+
+  // Copy search params from the route
+  for (const [name, value] of Object.entries(route.addSearchParams)) {
+    url.searchParams.set(name, value)
+  }
+
+  // Copy search params on the request
+  for (const [name, value] of new URL(request.url).searchParams) {
+    url.searchParams.set(name, value)
+  }
+  return url
+}
+
 // Create a redirection http Response
 export function redirect(
   route: RedirectRoute,
   match: unknown,
   request: Request,
 ) {
-  const url = new URL(template(route.url, match))
-  // Copy search params from the route
-  for (const [name, value] of Object.entries(route.addSearchParams)) {
-    url.searchParams.set(name, value)
-  }
-  // Copy search params on the request
-  for (const [name, value] of new URL(request.url).searchParams) {
-    url.searchParams.set(name, value)
-  }
+  const url = expandUrl(route, match, request)
   app.log('redirect', url.toString())
   return Response.redirect(url)
 }
@@ -105,15 +117,7 @@ export function getProxyRequest(
   request: Request,
   remoteAddr: Deno.NetAddr,
 ) {
-  const url = new URL(template(route.url, match))
-  // Copy search params from the route
-  for (const [name, value] of Object.entries(route.addSearchParams)) {
-    url.searchParams.set(name, value)
-  }
-  // Copy search params on the request
-  for (const [name, value] of new URL(request.url).searchParams) {
-    url.searchParams.set(name, value)
-  }
+  const url = expandUrl(route, match, request)
   app.log('proxy', url.toString())
 
   // Copy headers on the route
@@ -138,6 +142,24 @@ export function getProxyRequest(
   })
 }
 
+export function proxyWebSocket(
+  route: ProxyRoute,
+  match: unknown,
+  request: Request,
+) {
+  const upstream = new WebSocket(expandUrl(route, match, request))
+
+  const { response, socket: downstream } = Deno.upgradeWebSocket(request)
+
+  upstream.onmessage = (event) => downstream.send(event.data)
+  upstream.onclose = () => downstream.close()
+
+  downstream.onmessage = (event) => upstream.send(event.data)
+  downstream.onclose = () => upstream.close()
+
+  return response
+}
+
 // Create a proxy http response
 function proxy(
   route: ProxyRoute,
@@ -145,6 +167,9 @@ function proxy(
   request: Request,
   info: Deno.ServeHandlerInfo,
 ) {
+  if (request.headers.get('upgrade') === 'websocket') {
+    return proxyWebSocket(route, match, request)
+  }
   return fetch(getProxyRequest(route, match, request, info.remoteAddr))
 }
 

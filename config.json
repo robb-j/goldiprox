@@ -53,6 +53,11 @@
       "addHeaders": {
         "X-Hotel-Bar": "Hotel bar"
       }
+    },
+    {
+      "pattern": { "pathname": "/stream" },
+      "type": "proxy",
+      "url": "http://localhost:9000/stream"
     }
   ],
   "endpoint": {

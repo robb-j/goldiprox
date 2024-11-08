@@ -2,6 +2,12 @@
 
 This file contains notable changes to the project
 
+## 0.4.2
+
+- **feature** experimental
+  [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
+  support for proxy routes
+
 ## 0.4.1
 
 - **fix** search parameters are preserved while proxying/redirecting, i.e. the
