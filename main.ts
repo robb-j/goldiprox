@@ -6,7 +6,7 @@ import {
   RedirectRoute,
   Route,
 } from './config.ts'
-import { array, create, template } from './lib.ts'
+import { array, create, template, tryUrl } from './lib.ts'
 
 interface AppContext {
   state: 'running' | 'shutdown'
@@ -113,11 +113,10 @@ export function redirect(
 
 export function getProxyRequest(
   route: ProxyRoute,
-  match: unknown,
+  url: URL,
   request: Request,
   remoteAddr: Deno.NetAddr,
 ) {
-  const url = expandUrl(route, match, request)
   app.log('proxy', url.toString())
 
   // Copy headers on the route
@@ -143,34 +142,74 @@ export function getProxyRequest(
 }
 
 export function proxyWebSocket(
-  route: ProxyRoute,
-  match: unknown,
+  url: URL,
   request: Request,
 ) {
-  const upstream = new WebSocket(expandUrl(route, match, request))
+  const upstream = new WebSocket(url)
 
   const { response, socket: downstream } = Deno.upgradeWebSocket(request)
 
-  upstream.onmessage = (event) => downstream.send(event.data)
-  upstream.onclose = () => downstream.close()
+  upstream.onmessage = (event) => {
+    if (downstream.readyState === WebSocket.OPEN) downstream.send(event.data)
+  }
+  upstream.onclose = () => {
+    if (downstream.readyState === WebSocket.OPEN) downstream.close()
+  }
 
-  downstream.onmessage = (event) => upstream.send(event.data)
-  downstream.onclose = () => upstream.close()
+  downstream.onmessage = (event) => {
+    if (upstream.readyState === WebSocket.OPEN) upstream.send(event.data)
+  }
+  downstream.onclose = () => {
+    if (upstream.readyState === WebSocket.OPEN) upstream.close()
+  }
 
   return response
 }
 
 // Create a proxy http response
-function proxy(
+async function proxy(
   route: ProxyRoute,
   match: URLPatternResult,
   request: Request,
   info: Deno.ServeHandlerInfo,
 ) {
+  const url = expandUrl(route, match, request)
+
   if (request.headers.get('upgrade') === 'websocket') {
-    return proxyWebSocket(route, match, request)
+    return proxyWebSocket(url, request)
   }
-  return fetch(getProxyRequest(route, match, request, info.remoteAddr))
+  const response = await fetch(
+    getProxyRequest(route, url, request, info.remoteAddr),
+  )
+  const location = getLocation(response.headers, url)
+  return location ? applyRedirects(route, response, location, url) : response
+}
+
+export function getLocation(headers: Headers, base?: URL | string) {
+  const location = headers.get('location')
+  return location ? tryUrl(location, base) : null
+}
+
+export function applyRedirects(
+  route: ProxyRoute,
+  res: Response,
+  location: URL,
+  base: URL,
+) {
+  const headers = new Headers(res.headers)
+  for (const rewrite of route.redirects) {
+    const match = rewrite.pattern.exec(new URL(location, base))
+    if (match) {
+      headers.set('location', template(rewrite.url, match))
+      break
+    }
+  }
+
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  })
 }
 
 // Score a route for sorting

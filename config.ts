@@ -57,6 +57,12 @@ export const ProxyRoute = object({
   url: string(),
   addHeaders: defaulted(record(string(), string()), {}),
   addSearchParams: defaulted(record(string(), string()), {}),
+  redirects: defaulted(
+    array(
+      object({ pattern: Pattern, url: string() }),
+    ),
+    [],
+  ),
 })
 
 export type InternalRoute = Infer<typeof InternalRoute>

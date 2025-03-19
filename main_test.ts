@@ -1,7 +1,10 @@
 import { assertEquals } from '@std/assert'
 import {
+  applyRedirects,
+  expandUrl,
   getBaseRoutes,
   getHealthz,
+  getLocation,
   getProxyRequest,
   getRoutesz,
   redirect,
@@ -177,8 +180,9 @@ Deno.test('#getProxyRequest creates a request', async () => {
       url: 'https://example.com',
       addSearchParams: {},
       addHeaders: {},
+      redirects: [],
     },
-    {},
+    new URL('https://example.com'),
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
     { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
@@ -204,8 +208,9 @@ Deno.test('#getProxyRequest sets headers', () => {
       url: 'https://example.com',
       addSearchParams: {},
       addHeaders: {},
+      redirects: [],
     },
-    {},
+    new URL('https://example.com'),
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
     { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
@@ -236,26 +241,6 @@ Deno.test('#getProxyRequest sets headers', () => {
     'it should set the "x-forwarded-proto" header',
   )
 })
-Deno.test('#getProxyRequest replaces patterns in the URL', () => {
-  const result = getProxyRequest(
-    {
-      type: 'proxy',
-      pattern: new URLPattern({ pathname: '/:slug' }),
-      url: 'https://example.com/{{ pathname.groups.slug }}',
-      addSearchParams: {},
-      addHeaders: {},
-    },
-    { pathname: { groups: { slug: 'albatross' } } },
-    new Request('http://testing.local', { method: 'POST', body: 'hello' }),
-    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
-  )
-
-  assertEquals(
-    result.url,
-    'https://example.com/albatross',
-    'it should process the URL template and replace the slug in it',
-  )
-})
 Deno.test('#getProxyRequest inject headers onto the request', () => {
   const result = getProxyRequest(
     {
@@ -264,8 +249,9 @@ Deno.test('#getProxyRequest inject headers onto the request', () => {
       url: 'https://example.com',
       addSearchParams: {},
       addHeaders: { authorization: 'not_secret' },
+      redirects: [],
     },
-    {},
+    new URL('https://example.com'),
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
     { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
@@ -276,40 +262,135 @@ Deno.test('#getProxyRequest inject headers onto the request', () => {
     'it should add the authorization header from the addHeaders directive',
   )
 })
-Deno.test('#getProxyRequest append search parameters onto the request', () => {
-  const result = getProxyRequest(
+
+//
+// expandUrl
+//
+Deno.test('#expandUrl processes the template', () => {
+  const result = expandUrl(
     {
-      type: 'proxy',
-      pattern: new URLPattern({ pathname: '/' }),
-      url: 'https://example.com',
-      addSearchParams: { hello: 'there' },
-      addHeaders: {},
+      type: 'redirect',
+      pattern: new URLPattern({ pathname: '/:slug' }),
+      url: 'https://example.com/{{ pathname.groups.slug }}',
+      addSearchParams: {},
     },
-    {},
+    { pathname: { groups: { slug: 'albatross' } } },
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
-    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
 
   assertEquals(
-    result.url,
-    'https://example.com/?hello=there',
+    result,
+    new URL('https://example.com/albatross'),
+    'it should process the URL template and replace the slug in it',
+  )
+})
+Deno.test('#expandUrl appends search parameters onto the request', () => {
+  const result = expandUrl(
+    {
+      type: 'redirect',
+      pattern: new URLPattern({ pathname: '/' }),
+      url: 'https://example.com',
+      addSearchParams: { hello: 'there' },
+    },
+    {},
+    new Request('http://testing.local', { method: 'POST', body: 'hello' }),
+  )
+
+  assertEquals(
+    result,
+    new URL('https://example.com/?hello=there'),
     'it should append URL parameters based on addSearchParams',
   )
 })
-Deno.test('#getProxyRequest preserves request search parameters', () => {
-  const result = getProxyRequest(
+Deno.test('#expandUrl preserves request search parameters', () => {
+  const result = expandUrl(
+    {
+      type: 'redirect',
+      pattern: new URLPattern({ pathname: '/' }),
+      url: 'https://example.com',
+      addSearchParams: {},
+    },
+    {},
+    new Request('http://testing.local?name=Geoff'),
+  )
+
+  const url = new URL(result)
+  assertEquals(url.searchParams.get('name'), 'Geoff')
+})
+
+//
+// getLocation
+//
+Deno.test('#getLocation returns a URL', () => {
+  assertEquals(
+    getLocation(new Headers({ location: 'https://example.com/albatross' })),
+    new URL('https://example.com/albatross'),
+  )
+})
+Deno.test('#getLocation applies the base', () => {
+  assertEquals(
+    getLocation(
+      new Headers({ location: './albatross' }),
+      'https://example.com',
+    ),
+    new URL('https://example.com/albatross'),
+  )
+})
+
+//
+// applyRedirects
+//
+Deno.test('#applyRedirects returns a Response', async () => {
+  const result = applyRedirects(
     {
       type: 'proxy',
       pattern: new URLPattern({ pathname: '/' }),
       url: 'https://example.com',
       addSearchParams: {},
       addHeaders: {},
+      redirects: [
+        // {
+        //   pattern: new URLPattern({ pathname: '/somewhere/*' }),
+        //   url: 'http://testing.local/something/{{ pathname.groups.0}}',
+        // },
+      ],
     },
-    {},
-    new Request('http://testing.local?name=Geoff'),
-    { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
+    new Response('response_body', {
+      status: 419,
+      statusText: 'OKish',
+      headers: { 'X-Hotel-Bar': 'Hotel bar?' },
+    }),
+    new URL('https://example.com/somewhere'),
+    new URL('http://testing.local'),
   )
 
-  const url = new URL(result.url)
-  assertEquals(url.searchParams.get('name'), 'Geoff')
+  assertEquals(await result.text(), 'response_body')
+  assertEquals(result.status, 419)
+  assertEquals(result.statusText, 'OKish')
+  assertEquals(result.headers.get('X-Hotel-Bar'), 'Hotel bar?')
+})
+Deno.test('#applyRedirects applies the template', () => {
+  const result = applyRedirects(
+    {
+      type: 'proxy',
+      pattern: new URLPattern({ pathname: '/' }),
+      url: 'https://example.com',
+      addSearchParams: {},
+      addHeaders: {},
+      redirects: [
+        {
+          pattern: new URLPattern({ pathname: '/somewhere/*' }),
+          url: 'http://testing.local/something/{{ pathname.groups.0}}',
+        },
+      ],
+    },
+    new Response(),
+    new URL('https://example.com/somewhere/please'),
+    new URL('http://testing.local'),
+  )
+
+  assertEquals(
+    result.headers.get('Location'),
+    'http://testing.local/something/please',
+  )
 })

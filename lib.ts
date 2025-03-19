@@ -45,9 +45,9 @@ export function template(input: string, context: any) {
   )
 }
 
-export function tryUrl(input: string) {
+export function tryUrl(input: string, base?: string | URL) {
   try {
-    return new URL(input)
+    return new URL(input, base)
   } catch {
     return null
   }

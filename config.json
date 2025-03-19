@@ -58,6 +58,17 @@
       "pattern": { "pathname": "/stream" },
       "type": "proxy",
       "url": "http://localhost:9000/stream"
+    },
+    {
+      "pattern": { "pathname": "/redir-rewrite/*" },
+      "type": "proxy",
+      "url": "https://digitalinteraction.github.io/alembic/{{ pathname.groups.0 }}",
+      "redirects": [
+        {
+          "pattern": "https://digitalinteraction.github.io/alembic/*",
+          "url": "http://localhost:8000/redir-rewrite/{{ pathname.groups.0 }}"
+        }
+      ]
     }
   ],
   "endpoint": {

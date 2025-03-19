@@ -108,8 +108,10 @@ versioned assets at a different location:
 From the requester's perspective they won't see `s3.r0b.io` as the request is
 proxied by the server instead.
 
-You can tell Goldiprox to inject headers or search parameters by adding `addHeaders` or `addSearchParams` fields to your route definitions.
-Headers injected to `proxy` routes and search parameters are added to the query string for `proxy` and `redirect` routes:
+You can tell Goldiprox to inject headers or search parameters by adding
+`addHeaders` or `addSearchParams` fields to your route definitions. Headers
+injected to `proxy` routes and search parameters are added to the query string
+for `proxy` and `redirect` routes:
 
 ```json
 {
@@ -122,14 +124,26 @@ Headers injected to `proxy` routes and search parameters are added to the query 
   "addSearchParams": {
     "ref": "goldiprox"
   },
+  "redirects": [
+    {
+      "pattern": "https://example.com/*",
+      "url": "http://localhost:8080/{{ pathname.groups.0 }}"
+    }
+  ]
 }
 ```
 
-While proxying, the `Authorization` header will be injected into the proxy request and the `?ref=goldiprox` is added to the end of the URL.
-You can do the same with a `redirect` route, but you can't set headers, that only works with `proxy` routes.
+While proxying, the `Authorization` header will be injected into the proxy
+request and the `?ref=goldiprox` is added to the end of the URL. You can do the
+same with a `redirect` route, but you can't set headers, that only works with
+`proxy` routes.
 
-Goldiproxy can periodically fetch the routes from an external HTTP endpoint to let them
-change on demand to do cool and interesting things. See Configuration below.
+With a `proxy` route, you can also configure `redirects` which will process the
+`Location:` header to rewrite it to something else.
+
+Goldiproxy can periodically fetch the routes from an external HTTP endpoint to
+let them change on demand to do cool and interesting things. See Configuration
+below.
 
 ## Configuration
 
@@ -159,8 +173,8 @@ refetch at the specified interval. The interval is in **milliseconds**.
 ## Deployment
 
 Goldiprox is designed to be run as a container however you like to run your
-containers. It runs as a non-root user `id=1000`, it internally uses port `8000` and you
-should mount your config at `/app/config.json`.
+containers. It runs as a non-root user `id=1000`, it internally uses port `8000`
+and you should mount your config at `/app/config.json`.
 
 > WIP
 
