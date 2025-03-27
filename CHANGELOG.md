@@ -2,6 +2,11 @@
 
 This file contains notable changes to the project
 
+## 0.4.3
+
+- **feature** add optional `redirects` configuration to allow proxy routes to
+  rewrite redirects
+
 ## 0.4.2
 
 - **feature** experimental
