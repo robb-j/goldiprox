@@ -76,6 +76,9 @@ The templating in the URL lets you reference anything from the result of
 }
 ```
 
+> I also made this tool, [URLPattern Editor](https://urlpattern.r0b.io/?ref=goldiprox),
+> which helps construct patterns completely in the browser
+
 This is the same as before but is set on a per-component basis, it will use a
 wildcard for any component not set, such as the protocol and pathname in this
 case. Also note that the wildcard in pathname includes the `/` prefix, so you
@@ -152,9 +155,6 @@ Run Goldiprox with a JSON configuration, `config.json`, which is an array of the
 will use to periodically fetch routes and merge them with the static `routes`,
 both `routes` and `endpoint` are optional so you can set one, both or neither.
 Although setting neither would be a pretty boring server.
-
-> I also made this tool, [URLPattern Editor](https://urlpattern.r0b.io/?ref=goldiprox),
-> which helps construct patterns completely in the browser
 
 ```json
 {
