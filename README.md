@@ -153,6 +153,9 @@ will use to periodically fetch routes and merge them with the static `routes`,
 both `routes` and `endpoint` are optional so you can set one, both or neither.
 Although setting neither would be a pretty boring server.
 
+> I also made this tool, [URLPattern Editor](https://urlpattern.r0b.io/?ref=goldiprox),
+> which helps construct patterns completely in the browser
+
 ```json
 {
   "routes": ["..."],
