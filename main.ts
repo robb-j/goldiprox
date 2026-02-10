@@ -1,10 +1,12 @@
 import { parseArgs } from '@std/cli/parse-args'
+import * as path from '@std/path'
 import {
   AppConfig,
   getAppConfig,
-  ProxyRoute,
+  ProxyRedirect,
   RedirectRoute,
   Route,
+  WebsiteRoute,
 } from './config.ts'
 import { array, create, template, tryUrl } from './lib.ts'
 
@@ -80,9 +82,14 @@ async function fetchRoutes(url: string, staticRoutes: Route[]) {
   }
 }
 
+interface ExpandableRoute {
+  url: string
+  addSearchParams: Record<string, string>
+}
+
 // Expand the URL from a route with the matched content and inbound request
 export function expandUrl(
-  route: RedirectRoute | ProxyRoute,
+  route: ExpandableRoute,
   match: unknown,
   request: Request,
 ) {
@@ -111,9 +118,16 @@ export function redirect(
   return Response.redirect(url)
 }
 
+interface ProxyableRoute {
+  addHeaders: Record<string, string>
+  url: string
+  addSearchParams: Record<string, string>
+  redirects: ProxyRedirect[]
+}
+
 export function getProxyRequest(
-  route: ProxyRoute,
   url: URL,
+  addHeaders: Record<string, string>,
   request: Request,
   remoteAddr: Deno.NetAddr,
 ) {
@@ -121,7 +135,7 @@ export function getProxyRequest(
 
   // Copy headers on the route
   const headers = new Headers(request.headers)
-  for (const [name, value] of Object.entries(route.addHeaders)) {
+  for (const [name, value] of Object.entries(addHeaders)) {
     headers.set(name, value)
   }
   headers.set('Host', url.hostname)
@@ -167,22 +181,67 @@ export function proxyWebSocket(
 }
 
 // Create a proxy http response
-async function proxy(
-  route: ProxyRoute,
+function proxy(
+  route: ProxyableRoute,
   match: URLPatternResult,
   request: Request,
-  info: Deno.ServeHandlerInfo,
+  remoteAddress: Deno.NetAddr,
 ) {
-  const url = expandUrl(route, match, request)
+  return _handleProxy(
+    expandUrl(route, match, request),
+    route,
+    request,
+    remoteAddress,
+  )
+}
 
+async function _handleProxy(
+  url: URL,
+  route: ProxyableRoute,
+  request: Request,
+  remoteAddress: Deno.NetAddr,
+) {
   if (request.headers.get('upgrade') === 'websocket') {
     return proxyWebSocket(url, request)
   }
   const response = await fetch(
-    getProxyRequest(route, url, request, info.remoteAddr),
+    getProxyRequest(url, route.addHeaders, request, remoteAddress),
   )
   const location = getLocation(response.headers, url)
-  return location ? applyRedirects(route, response, location, url) : response
+  return location
+    ? applyRedirects(route.redirects, response, location, url)
+    : response
+}
+
+export function* expandWebsites(
+  base: URL,
+  indexes: string[],
+): Iterable<URL> {
+  if (!base.pathname.endsWith('/')) {
+    return yield base
+  }
+
+  for (const index of indexes) {
+    const url = new URL(base)
+    url.pathname = path.join(url.pathname, index)
+    yield url
+  }
+}
+
+async function website(
+  route: WebsiteRoute,
+  match: URLPatternResult,
+  request: Request,
+  remoteAddress: Deno.NetAddr,
+) {
+  const base = expandUrl(route, match, request)
+
+  for (const url of expandWebsites(base, route.index)) {
+    const response = await _handleProxy(url, route, request, remoteAddress)
+    if (response.ok) return response
+  }
+
+  return new Response('Not Found', { status: 404 })
 }
 
 export function getLocation(headers: Headers, base?: URL | string) {
@@ -191,13 +250,13 @@ export function getLocation(headers: Headers, base?: URL | string) {
 }
 
 export function applyRedirects(
-  route: ProxyRoute,
+  redirects: ProxyRedirect[],
   res: Response,
   location: URL,
   base: URL,
 ) {
   const headers = new Headers(res.headers)
-  for (const rewrite of route.redirects) {
+  for (const rewrite of redirects) {
     const match = rewrite.pattern.exec(new URL(location, base))
     if (match) {
       headers.set('location', template(rewrite.url, match))
@@ -260,7 +319,7 @@ function prettyRoute(route: Route) {
 // Handle a HTTP request with our proxy or redirect logic
 function handleRequest(
   request: Request,
-  info: Deno.ServeHandlerInfo,
+  info: Deno.ServeHandlerInfo<Deno.NetAddr>,
   app: AppContext,
 ) {
   try {
@@ -272,7 +331,10 @@ function handleRequest(
         return redirect(route, match, request)
       }
       if (route.type === 'proxy') {
-        return proxy(route, match, request, info)
+        return proxy(route, match, request, info.remoteAddr)
+      }
+      if (route.type === 'website') {
+        return website(route, match, request, info.remoteAddr)
       }
       if (route.type === 'internal') {
         return route.fn(request)
@@ -286,7 +348,7 @@ function handleRequest(
   }
 }
 
-async function shutdown(appConfig: AppConfig, server: Deno.Server) {
+async function shutdown(appConfig: AppConfig, server: Deno.HttpServer) {
   console.log('Exiting...')
   app.state = 'shutdown'
   server.unref()
@@ -336,7 +398,7 @@ if (import.meta.main) {
 
   const server = Deno.serve(
     { port: parseInt(port) },
-    (r, i) => handleRequest(r, i, app),
+    (req, info) => handleRequest(req, info, app),
   )
 
   Deno.addSignalListener('SIGINT', () => shutdown(appConfig, server))

@@ -43,11 +43,17 @@ export const HttpHandler = define<HttpHandler>(
 )
 
 export type RedirectRoute = Infer<typeof RedirectRoute>
-const RedirectRoute = object({
+export const RedirectRoute = object({
   type: literal('redirect'),
   pattern: Pattern,
   url: string(),
   addSearchParams: defaulted(record(string(), string()), {}),
+})
+
+export type ProxyRedirect = Infer<typeof ProxyRedirect>
+export const ProxyRedirect = object({
+  pattern: Pattern,
+  url: string(),
 })
 
 export type ProxyRoute = Infer<typeof ProxyRoute>
@@ -57,12 +63,18 @@ export const ProxyRoute = object({
   url: string(),
   addHeaders: defaulted(record(string(), string()), {}),
   addSearchParams: defaulted(record(string(), string()), {}),
-  redirects: defaulted(
-    array(
-      object({ pattern: Pattern, url: string() }),
-    ),
-    [],
-  ),
+  redirects: defaulted(array(ProxyRedirect), []),
+})
+
+export type WebsiteRoute = Infer<typeof WebsiteRoute>
+export const WebsiteRoute = object({
+  type: literal('website'),
+  pattern: Pattern,
+  url: string(),
+  addHeaders: defaulted(record(string(), string()), {}),
+  addSearchParams: defaulted(record(string(), string()), {}),
+  index: defaulted(array(string()), ['index.html']),
+  redirects: defaulted(array(ProxyRedirect), []),
 })
 
 export type InternalRoute = Infer<typeof InternalRoute>
@@ -73,7 +85,12 @@ export const InternalRoute = object({
 })
 
 export type Route = Infer<typeof Route>
-export const Route = union([RedirectRoute, ProxyRoute, InternalRoute])
+export const Route = union([
+  RedirectRoute,
+  ProxyRoute,
+  InternalRoute,
+  WebsiteRoute,
+])
 
 export type EndpointSource = Infer<typeof EndpointSource>
 export const EndpointSource = object({

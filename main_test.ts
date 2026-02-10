@@ -2,6 +2,7 @@ import { assertEquals } from '@std/assert'
 import {
   applyRedirects,
   expandUrl,
+  expandWebsites,
   getBaseRoutes,
   getHealthz,
   getLocation,
@@ -174,15 +175,8 @@ Deno.test('#redirect preserves request search parameters', () => {
 //
 Deno.test('#getProxyRequest creates a request', async () => {
   const result = getProxyRequest(
-    {
-      type: 'proxy',
-      pattern: new URLPattern({ pathname: '/' }),
-      url: 'https://example.com',
-      addSearchParams: {},
-      addHeaders: {},
-      redirects: [],
-    },
     new URL('https://example.com'),
+    {},
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
     { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
@@ -202,15 +196,8 @@ Deno.test('#getProxyRequest creates a request', async () => {
 })
 Deno.test('#getProxyRequest sets headers', () => {
   const result = getProxyRequest(
-    {
-      type: 'proxy',
-      pattern: new URLPattern({ pathname: '/' }),
-      url: 'https://example.com',
-      addSearchParams: {},
-      addHeaders: {},
-      redirects: [],
-    },
     new URL('https://example.com'),
+    {},
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
     { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
@@ -243,15 +230,8 @@ Deno.test('#getProxyRequest sets headers', () => {
 })
 Deno.test('#getProxyRequest inject headers onto the request', () => {
   const result = getProxyRequest(
-    {
-      type: 'proxy',
-      pattern: new URLPattern({ pathname: '/' }),
-      url: 'https://example.com',
-      addSearchParams: {},
-      addHeaders: { authorization: 'not_secret' },
-      redirects: [],
-    },
     new URL('https://example.com'),
+    { authorization: 'not_secret' },
     new Request('http://testing.local', { method: 'POST', body: 'hello' }),
     { transport: 'tcp', hostname: '127.0.0.1', port: 8000 },
   )
@@ -269,8 +249,6 @@ Deno.test('#getProxyRequest inject headers onto the request', () => {
 Deno.test('#expandUrl processes the template', () => {
   const result = expandUrl(
     {
-      type: 'redirect',
-      pattern: new URLPattern({ pathname: '/:slug' }),
       url: 'https://example.com/{{ pathname.groups.slug }}',
       addSearchParams: {},
     },
@@ -287,8 +265,6 @@ Deno.test('#expandUrl processes the template', () => {
 Deno.test('#expandUrl appends search parameters onto the request', () => {
   const result = expandUrl(
     {
-      type: 'redirect',
-      pattern: new URLPattern({ pathname: '/' }),
       url: 'https://example.com',
       addSearchParams: { hello: 'there' },
     },
@@ -305,8 +281,6 @@ Deno.test('#expandUrl appends search parameters onto the request', () => {
 Deno.test('#expandUrl preserves request search parameters', () => {
   const result = expandUrl(
     {
-      type: 'redirect',
-      pattern: new URLPattern({ pathname: '/' }),
       url: 'https://example.com',
       addSearchParams: {},
     },
@@ -342,19 +316,7 @@ Deno.test('#getLocation applies the base', () => {
 //
 Deno.test('#applyRedirects returns a Response', async () => {
   const result = applyRedirects(
-    {
-      type: 'proxy',
-      pattern: new URLPattern({ pathname: '/' }),
-      url: 'https://example.com',
-      addSearchParams: {},
-      addHeaders: {},
-      redirects: [
-        // {
-        //   pattern: new URLPattern({ pathname: '/somewhere/*' }),
-        //   url: 'http://testing.local/something/{{ pathname.groups.0}}',
-        // },
-      ],
-    },
+    [],
     new Response('response_body', {
       status: 419,
       statusText: 'OKish',
@@ -371,19 +333,12 @@ Deno.test('#applyRedirects returns a Response', async () => {
 })
 Deno.test('#applyRedirects applies the template', () => {
   const result = applyRedirects(
-    {
-      type: 'proxy',
-      pattern: new URLPattern({ pathname: '/' }),
-      url: 'https://example.com',
-      addSearchParams: {},
-      addHeaders: {},
-      redirects: [
-        {
-          pattern: new URLPattern({ pathname: '/somewhere/*' }),
-          url: 'http://testing.local/something/{{ pathname.groups.0}}',
-        },
-      ],
-    },
+    [
+      {
+        pattern: new URLPattern({ pathname: '/somewhere/*' }),
+        url: 'http://testing.local/something/{{ pathname.groups.0}}',
+      },
+    ],
     new Response(),
     new URL('https://example.com/somewhere/please'),
     new URL('http://testing.local'),
@@ -393,4 +348,28 @@ Deno.test('#applyRedirects applies the template', () => {
     result.headers.get('Location'),
     'http://testing.local/something/please',
   )
+})
+
+//
+// expandWebsites
+//
+Deno.test('#expandWebsites ignores files', () => {
+  const result = Array.from(expandWebsites(
+    new URL('http://testing.local/banger.mp3'),
+    ['index.html'],
+  ))
+
+  assertEquals(result, [new URL('http://testing.local/banger.mp3')])
+})
+Deno.test('#expandWebsites expands indexes', () => {
+  const result = Array.from(expandWebsites(
+    new URL('http://testing.local'),
+    ['index.html', 'index.htm', 'another.txt'],
+  ))
+
+  assertEquals(result, [
+    new URL('http://testing.local/index.html'),
+    new URL('http://testing.local/index.htm'),
+    new URL('http://testing.local/another.txt'),
+  ])
 })

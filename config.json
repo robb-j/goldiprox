@@ -69,6 +69,11 @@
           "url": "http://localhost:8000/redir-rewrite/{{ pathname.groups.0 }}"
         }
       ]
+    },
+    {
+      "pattern": { "pathname": "/website/:domain/:path*{/}?" },
+      "type": "website",
+      "url": "https://objects.r0b.io/websites/{{ pathname.groups.domain }}/{{ pathname.groups.path }}"
     }
   ],
   "endpoint": {

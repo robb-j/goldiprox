@@ -9,6 +9,8 @@ Goldiprox is a minimal reverse-proxy and redirection server with routing based
 on the (semi) web-standards URLPattern. It is either configured with a static
 set of routes or it can pull down the routes to serve from a HTTP endpoint.
 
+### redirect
+
 Routes are a URLPattern and a target to tell it how to process the request. This
 is a simple redirection endpoint:
 
@@ -76,22 +78,20 @@ The templating in the URL lets you reference anything from the result of
 }
 ```
 
-> I also made this tool, [URLPattern Editor](https://urlpattern.r0b.io/?ref=goldiprox),
-> which helps construct patterns completely in the browser
+> I also made this tool,
+> [URLPattern Editor](https://urlpattern.r0b.io/?ref=goldiprox), which helps
+> construct patterns completely in the browser
 
 This is the same as before but is set on a per-component basis, it will use a
 wildcard for any component not set, such as the protocol and pathname in this
 case. Also note that the wildcard in pathname includes the `/` prefix, so you
 don't need to put it in the URL template here.
 
+### proxy
+
 So far this has all been about redirection, but the other power is in proxying
 requests. This lets you rewrite requests to look a different way or access
 things on networks not available to the client:
-
-> In the future there could be more options to proxy, e.g. to add secret headers
-> or parameters to the request during the proxy. For example you might want to
-> set an `Authorization` header in-flight to access resources behind
-> authentication.
 
 ```json
 {
@@ -148,6 +148,30 @@ Goldiproxy can periodically fetch the routes from an external HTTP endpoint to
 let them change on demand to do cool and interesting things. See Configuration
 below.
 
+### website
+
+Another type of route is for turning static assets into a website, this works
+like nginx where it will look for
+[index](https://docs.nginx.com/nginx/admin-guide/web-server/serving-static-content/)
+files based on the URL being requested. Under the hood it uses the
+[proxy](#proxy) to perform requests and handle redirects in the same way.
+
+For example, if you request `https://example.com/` it will try
+`https://example.com/index.html`.
+
+```json
+{
+  "pattern": { "hostname": ":domain.example.com" },
+  "type": "website",
+  "url": "https://s3.r0b.io/{{ hostname.groups.domain }}/{{ pathname.groups.path }}",
+  "index": ["index.html", "index.htm"]
+}
+```
+
+You can set the same parameters as [proxy](#proxy) with the extra optional
+`index` which is used to set which files to try and request. By default it will
+just try `index.html`.
+
 ## Configuration
 
 Run Goldiprox with a JSON configuration, `config.json`, which is an array of the
@@ -158,7 +182,7 @@ Although setting neither would be a pretty boring server.
 
 ```json
 {
-  "routes": ["..."],
+  "routes": ["…"],
   "endpoint": {
     "url": "https://r0b.io/goldiprox-routes",
     "interval": 10000

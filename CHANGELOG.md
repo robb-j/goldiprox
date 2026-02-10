@@ -2,6 +2,11 @@
 
 This file contains notable changes to the project
 
+## 0.5.0
+
+- **feature** add new `website` type routes to host static files as a website
+- **internal** migrate to deno 2
+
 ## 0.4.3
 
 - **feature** add optional `redirects` configuration to allow proxy routes to
