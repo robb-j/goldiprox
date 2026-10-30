@@ -256,10 +256,19 @@ export function applyRedirects(
   base: URL,
 ) {
   const headers = new Headers(res.headers)
+
   for (const rewrite of redirects) {
     const match = rewrite.pattern.exec(new URL(location, base))
     if (match) {
-      headers.set('location', template(rewrite.url, match))
+      const target = tryUrl(template(rewrite.url, match))
+
+      if (target) {
+        if (!target.search) target.search = location.search
+        if (!target.hash) target.hash = location.hash
+        headers.set('location', target.href)
+      } else {
+        headers.set('location', template(rewrite.url, match))
+      }
       break
     }
   }

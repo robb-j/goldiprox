@@ -2,6 +2,11 @@
 
 This file contains notable changes to the project
 
+## 0.5.1
+
+- **fix** proxy route `redirects` preserve search + hash components unless
+  overridden
+
 ## 0.5.0
 
 - **feature** add new `website` type routes to host static files as a website
